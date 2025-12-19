@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+supabase
+python-dotenv
+pydantic
+requests
+httpx
+transformers
+underthesea
+rouge-score
+sentence-transformers
+torch
+numpy
+scikit-learn
+pysbd
