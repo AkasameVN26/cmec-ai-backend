@@ -88,7 +88,7 @@ class MetricService:
         top_indices = np.argsort(scores)[::-1][:top_k]
         return top_indices.tolist()
 
-    def _rank_embedding(self, query: str, documents: List[str], top_k: int = 20) -> List[int]:
+    def _rank_embedding(self, query: str, documents: List[str], top_k: int = 20, doc_embs: torch.Tensor = None) -> List[int]:
         """
         Retrieve Top-K candidates using Cosine Similarity (Qwen-Embedding).
         Returns a list of indices.
@@ -97,9 +97,12 @@ class MetricService:
         if not self.embed_model:
             return []
             
-        # Embed query and docs
+        # Embed query
         query_emb = self.embed_model.encode(query, convert_to_tensor=True, normalize_embeddings=True)
-        doc_embs = self.embed_model.encode(documents, convert_to_tensor=True, normalize_embeddings=True)
+
+        # Embed docs if not provided
+        if doc_embs is None:
+            doc_embs = self.embed_model.encode(documents, convert_to_tensor=True, normalize_embeddings=True)
         
         # Calculate cosine similarity
         scores = util.cos_sim(query_emb, doc_embs)[0]
@@ -244,6 +247,11 @@ class MetricService:
         # We will keep model on GPU for the loop if we restructure, 
         # but to keep logic simple we'll just keep it on GPU for the whole duration of this function's embedding phase.
         
+        # Pre-calculate document embeddings ONCE
+        doc_embs = None
+        if self.embed_model:
+            doc_embs = self.embed_model.encode(documents, convert_to_tensor=True, normalize_embeddings=True)
+
         # Actually, let's restructure the loop to separate phases to minimize swapping.
         # Phase 1: Retrieve Candidates (BM25 + Embedding)
         all_top_candidates = []
@@ -251,7 +259,7 @@ class MetricService:
         for i, query_sent in enumerate(summary_sents):
             # A. Hybrid Retrieval (BM25 + Embedding)
             bm25_indices = self._rank_bm25(query_sent, documents, top_k=20)
-            emb_indices = self._rank_embedding(query_sent, documents, top_k=20)
+            emb_indices = self._rank_embedding(query_sent, documents, top_k=20, doc_embs=doc_embs)
             
             # B. RRF Fusion
             top_candidates = self._rrf_fusion([bm25_indices, emb_indices], k=60, top_k=10)
