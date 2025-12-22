@@ -12,20 +12,12 @@ class PreparedInput(BaseModel):
     raw_notes_count: int
     source_segments: List[SourceSegment] = []
 
-class MetricResult(BaseModel):
-    f1: float
-    p: float
-    r: float
-
 class EvaluationMetrics(BaseModel):
     duration: float
     input_tokens: int
     output_tokens: int
     ratio: float
     similarity_score: float
-    rouge1: MetricResult
-    rouge2: MetricResult
-    rougeL: MetricResult
 
 class SummaryResponse(BaseModel):
     id_ho_so: int

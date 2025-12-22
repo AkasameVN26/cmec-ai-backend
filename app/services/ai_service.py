@@ -11,19 +11,10 @@ SYSTEM_PROMPT = """Bạn là trợ lý y tế chuyên tóm tắt bệnh án chí
 Nhiệm vụ: Tóm tắt bệnh án dựa hoàn toàn vào văn bản được cung cấp.
 Quy tắc bắt buộc:
 - Chỉ sử dụng thông tin CÓ TRONG VĂN BẢN. Tuyệt đối KHÔNG sử dụng kiến thức bên ngoài hay tự suy luận. Nếu thông tin bị thiếu, hãy bỏ qua.
-- Trích xuất tối đa các chi tiết lâm sàng có giá trị NẾU CHÚNG CÓ TRONG VĂN BẢN. BỎ QUA CÁC DẤU HIỆU BÌNH THƯỜNG.
-- Chỉ trình bày bản tóm tắt **ngắn gọn**, không đưa ra lời khuyên hay nhận xét cá nhân."""
+- Trích xuất tối đa các chi tiết lâm sàng có giá trị NẾU CHÚNG CÓ TRONG VĂN BẢN.
+- Chỉ trình bày bản tóm tắt, không đưa ra lời khuyên hay nhận xét cá nhân."""
 
-BASE_INSTRUCTION = """CẤU TRÚC TÓM TẮT:
-1. Thông tin chung: 
-2. Lý do nhập viện: 
-3. Tiền căn: (tóm tắt tiền sử gia đình, xã hội)
-4. Tóm tắt bệnh sử & Diễn biến bệnh: 
-5. Khám Lâm sàng: (tóm tắt các dấu hiệu bất thường)
-6. Kết luận của các kết quả Cận lâm sàng: 
-7. Chẩn đoán & Kế hoạch điều trị: 
-
-Dựa vào văn bản dưới đây, hãy hoàn thành bản tóm tắt:"""
+BASE_INSTRUCTION = "Tóm tắt diễn biến điều trị của hồ sơ bệnh án sau:"
 
 OPTIONS = {
     "repeat_penalty": 1.05,
@@ -45,6 +36,7 @@ class AIService:
                 {"role": "user", "content": full_user_content}
             ],
             "stream": True,
+            "keep_alive": 0,
             "options": OPTIONS
         }
         
@@ -92,6 +84,7 @@ class AIService:
                 {"role": "user", "content": full_user_content}
             ],
             "stream": False,
+            "keep_alive": 0,
             "options": OPTIONS
         }
         
