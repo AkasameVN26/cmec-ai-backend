@@ -73,13 +73,11 @@ class MetricService:
         self._is_loaded = True
         print(f"[{self.__class__.__name__}] Models loaded in {time.time() - start_t:.2f}s")
 
-    def _rank_bm25(self, query: str, documents: List[str], top_k: int = 20) -> List[int]:
+    def _rank_bm25(self, query: str, bm25: BM25Okapi, top_k: int = 20) -> List[int]:
         """
         Retrieve Top-K candidates using BM25.
         Returns a list of indices.
         """
-        tokenized_corpus = [word_tokenize(doc) for doc in documents]
-        bm25 = BM25Okapi(tokenized_corpus)
         tokenized_query = word_tokenize(query)
         
         # Get scores
@@ -254,11 +252,17 @@ class MetricService:
 
         # Actually, let's restructure the loop to separate phases to minimize swapping.
         # Phase 1: Retrieve Candidates (BM25 + Embedding)
+
+        # Build BM25 index ONCE
+        print("Building BM25 index...")
+        tokenized_corpus = [word_tokenize(doc) for doc in documents]
+        bm25 = BM25Okapi(tokenized_corpus)
+
         all_top_candidates = []
         
         for i, query_sent in enumerate(summary_sents):
             # A. Hybrid Retrieval (BM25 + Embedding)
-            bm25_indices = self._rank_bm25(query_sent, documents, top_k=20)
+            bm25_indices = self._rank_bm25(query_sent, bm25, top_k=20)
             emb_indices = self._rank_embedding(query_sent, documents, top_k=20, doc_embs=doc_embs)
             
             # B. RRF Fusion
