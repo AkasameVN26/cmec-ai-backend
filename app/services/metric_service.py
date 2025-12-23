@@ -247,8 +247,17 @@ class MetricService:
         
         # Pre-calculate document embeddings ONCE
         doc_embs = None
-        if self.embed_model:
+        all_emb_scores = None
+
+        if self.embed_model and documents:
             doc_embs = self.embed_model.encode(documents, convert_to_tensor=True, normalize_embeddings=True)
+
+            # ⚡ Bolt Optimization: Batch encode all summary sentences at once
+            # This reduces embedding model calls from N+1 to 2
+            if summary_sents:
+                query_embs = self.embed_model.encode(summary_sents, convert_to_tensor=True, normalize_embeddings=True)
+                # Compute all similarities in one matrix operation [num_queries, num_docs]
+                all_emb_scores = util.cos_sim(query_embs, doc_embs)
 
         # Actually, let's restructure the loop to separate phases to minimize swapping.
         # Phase 1: Retrieve Candidates (BM25 + Embedding)
@@ -263,7 +272,18 @@ class MetricService:
         for i, query_sent in enumerate(summary_sents):
             # A. Hybrid Retrieval (BM25 + Embedding)
             bm25_indices = self._rank_bm25(query_sent, bm25, top_k=20)
-            emb_indices = self._rank_embedding(query_sent, documents, top_k=20, doc_embs=doc_embs)
+
+            # Optimized Embedding Retrieval
+            emb_indices = []
+            if all_emb_scores is not None:
+                # Extract scores for the current query sentence
+                scores = all_emb_scores[i]
+                # Get top-k indices efficiently
+                top_vals, top_indices = torch.topk(scores, k=min(20, len(documents)))
+                emb_indices = top_indices.tolist()
+            else:
+                # Fallback (should be covered by batching, but keeps safety)
+                emb_indices = self._rank_embedding(query_sent, documents, top_k=20, doc_embs=doc_embs)
             
             # B. RRF Fusion
             top_candidates = self._rrf_fusion([bm25_indices, emb_indices], k=60, top_k=10)
