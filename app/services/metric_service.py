@@ -139,7 +139,7 @@ class MetricService:
         # Prepare formatting constants
         prefix = "<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n"
         suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
-        task = "Given a web search query, retrieve relevant passages that answer the query"
+        task = "Given a claim from a medical summary, determine if the Clinical Document provides evidence to support that claim."
         
         prefix_tokens = self.reranker_tokenizer.encode(prefix, add_special_tokens=False)
         suffix_tokens = self.reranker_tokenizer.encode(suffix, add_special_tokens=False)
