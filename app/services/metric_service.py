@@ -163,7 +163,7 @@ class MetricService:
              return [(candidates[0] if candidates else -1, 0.0) for candidates in all_candidate_indices]
 
         # Tokenize and Inference in Chunks
-        BATCH_SIZE = 16
+        BATCH_SIZE = 8 # Reduced from 16 to prevent system hang/OOM
         all_scores = []
         
         for i in range(0, len(all_pairs), BATCH_SIZE):

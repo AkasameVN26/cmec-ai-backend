@@ -14,7 +14,15 @@ Quy tắc bắt buộc:
 - Trích xuất tối đa các chi tiết lâm sàng có giá trị NẾU CHÚNG CÓ TRONG VĂN BẢN.
 - Chỉ trình bày bản tóm tắt, không đưa ra lời khuyên hay nhận xét cá nhân."""
 
-BASE_INSTRUCTION = "Tóm tắt diễn biến điều trị của hồ sơ bệnh án sau:"
+BASE_INSTRUCTION = """CẤU TRÚC TÓM TẮT:
+1. Thông tin chung & Lý do khám:
+2. Tiền sử:
+3. Tóm tắt bệnh sử & Diễn biến:
+4. Khám Lâm sàng (Chỉ ghi dấu hiệu dương tính & Sinh hiệu):
+5. Các kết luận của kết quả Cận lâm sàng:
+6. Chẩn đoán & Kế hoạch điều trị (Thuốc/Thủ thuật):
+
+Dựa vào văn bản dưới đây, hãy hoàn thành bản tóm tắt:"""
 
 OPTIONS = {
     "repeat_penalty": 1.05,
@@ -44,7 +52,7 @@ class AIService:
         print(f"[AIService] Starting stream for model: {settings.OLLAMA_MODEL}")
         
         try:
-            async with httpx.AsyncClient(timeout=300.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 async with client.stream(
                     "POST",
                     f"{settings.OLLAMA_BASE_URL}/api/chat", 
@@ -94,7 +102,7 @@ class AIService:
         start_time = time.time()
         
         try:
-            async with httpx.AsyncClient(timeout=300.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
                     f"{settings.OLLAMA_BASE_URL}/api/chat", 
                     json=ollama_payload, 

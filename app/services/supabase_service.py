@@ -1,4 +1,4 @@
-from supabase import create_client, Client
+from supabase import create_client, Client, ClientOptions
 from app.core.config import settings
 from app.models.schemas import PreparedInput, SourceSegment
 from datetime import datetime
@@ -7,7 +7,8 @@ from typing import List, Dict, Any
 
 class SupabaseService:
     def __init__(self):
-        self.client: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+        options = ClientOptions(postgrest_client_timeout=60)
+        self.client: Client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY, options=options)
 
     def _fetch_patient_info(self, id_ho_so: int) -> SourceSegment:
         tuoi_str = "Không rõ"
