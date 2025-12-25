@@ -126,15 +126,13 @@ class MetricService:
         
         return [doc_idx for doc_idx, score in sorted_docs[:top_k]]
 
-    def _rerank_candidates(self, query: str, documents: List[str], candidate_indices: List[int]) -> Tuple[int, float]:
+    def _rerank_batch(self, queries: List[str], documents: List[str], all_candidate_indices: List[List[int]]) -> List[Tuple[int, float]]:
         """
-        Rerank the Top-10 candidates using Qwen3-Reranker-0.6B.
-        Returns the single best match index and its score.
-        Assumes reranker_model is already on the correct device.
+        Batch Rerank candidates for multiple queries using Qwen3-Reranker-0.6B.
+        Returns a list of (best_idx, best_score) for each query.
         """
         if not self.reranker_model or not self.reranker_tokenizer:
-            # Fallback to first candidate if reranker not available
-            return (candidate_indices[0], 0.0) if candidate_indices else (-1, 0.0)
+            return [(candidates[0] if candidates else -1, 0.0) for candidates in all_candidate_indices]
 
         # Prepare formatting constants
         prefix = "<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be \"yes\" or \"no\".<|im_end|>\n<|im_start|>user\n"
@@ -146,50 +144,78 @@ class MetricService:
         
         token_false_id = self.reranker_tokenizer.convert_tokens_to_ids("no")
         token_true_id = self.reranker_tokenizer.convert_tokens_to_ids("yes")
-        # max_length is used for truncation limit, not fixed padding
         max_length = 4096
 
-        # Format input pairs
-        pairs = []
-        for idx in candidate_indices:
-            doc = documents[idx]
-            formatted_input = "<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc}".format(
-                instruction=task, query=query, doc=doc
-            )
-            pairs.append(formatted_input)
-
-        # Tokenize with truncation to max_length, but NO padding yet
-        inputs = self.reranker_tokenizer(
-            pairs, padding=False, truncation='longest_first',
-            return_attention_mask=False, max_length=max_length - len(prefix_tokens) - len(suffix_tokens)
-        )
+        all_pairs = []
         
-        # Add prefix/suffix
-        for i, ele in enumerate(inputs['input_ids']):
-            inputs['input_ids'][i] = prefix_tokens + ele + suffix_tokens
+        for i, (query, candidates) in enumerate(zip(queries, all_candidate_indices)):
+            if not candidates:
+                continue
             
-        # Pad dynamically (padding=True pads to the longest sequence in the batch)
-        inputs = self.reranker_tokenizer.pad(inputs, padding=True, return_tensors="pt")
-        
-        # Move to device
-        for key in inputs:
-            inputs[key] = inputs[key].to(self.device)
+            for idx in candidates:
+                doc = documents[idx]
+                formatted_input = "<Instruct>: {instruction}\n<Query>: {query}\n<Document>: {doc}".format(
+                    instruction=task, query=query, doc=doc
+                )
+                all_pairs.append(formatted_input)
 
-        # Inference
-        with torch.no_grad():
-            batch_scores = self.reranker_model(**inputs).logits[:, -1, :]
-            true_vector = batch_scores[:, token_true_id]
-            false_vector = batch_scores[:, token_false_id]
-            batch_scores = torch.stack([false_vector, true_vector], dim=1)
-            batch_scores = torch.nn.functional.log_softmax(batch_scores, dim=1)
-            scores = batch_scores[:, 1].exp().tolist()
+        if not all_pairs:
+             return [(candidates[0] if candidates else -1, 0.0) for candidates in all_candidate_indices]
 
-        # Find best score
-        best_local_idx = np.argmax(scores)
-        best_global_idx = candidate_indices[best_local_idx]
-        best_score = scores[best_local_idx]
+        # Tokenize and Inference in Chunks
+        BATCH_SIZE = 16
+        all_scores = []
         
-        return best_global_idx, best_score
+        for i in range(0, len(all_pairs), BATCH_SIZE):
+            batch_pairs = all_pairs[i : i + BATCH_SIZE]
+
+            # Tokenize
+            inputs = self.reranker_tokenizer(
+                batch_pairs, padding=False, truncation='longest_first',
+                return_attention_mask=False, max_length=max_length - len(prefix_tokens) - len(suffix_tokens)
+            )
+
+             # Add prefix/suffix
+            for j, ele in enumerate(inputs['input_ids']):
+                inputs['input_ids'][j] = prefix_tokens + ele + suffix_tokens
+
+            # Pad dynamically
+            inputs = self.reranker_tokenizer.pad(inputs, padding=True, return_tensors="pt")
+
+            # Move to device
+            for key in inputs:
+                inputs[key] = inputs[key].to(self.device)
+
+            # Inference
+            with torch.no_grad():
+                logits = self.reranker_model(**inputs).logits[:, -1, :]
+                true_vector = logits[:, token_true_id]
+                false_vector = logits[:, token_false_id]
+                stacked_logits = torch.stack([false_vector, true_vector], dim=1)
+                log_probs = torch.nn.functional.log_softmax(stacked_logits, dim=1)
+                scores = log_probs[:, 1].exp().tolist()
+                all_scores.extend(scores)
+
+        # Reconstruct results
+        results = []
+        current_pair_idx = 0
+
+        for candidates in all_candidate_indices:
+            if not candidates:
+                results.append((-1, 0.0))
+                continue
+
+            # Get scores for this query
+            num_candidates = len(candidates)
+            query_scores = all_scores[current_pair_idx : current_pair_idx + num_candidates]
+            current_pair_idx += num_candidates
+
+            best_local_idx = np.argmax(query_scores)
+            best_global_idx = candidates[best_local_idx]
+            best_score = query_scores[best_local_idx]
+            results.append((best_global_idx, best_score))
+
+        return results
 
     def _explain_summary_sync(self, source_segments: List[SourceSegment], summary_text: str):
         # Force cleanup before loading heavy models to GPU
@@ -241,10 +267,6 @@ class MetricService:
         if self.embed_model:
             self.embed_model.to(self.device)
         
-        # Pre-calculate embeddings if possible, but our logic is per-sentence query.
-        # We will keep model on GPU for the loop if we restructure, 
-        # but to keep logic simple we'll just keep it on GPU for the whole duration of this function's embedding phase.
-        
         # Pre-calculate document embeddings ONCE
         doc_embs = None
         all_emb_scores = None
@@ -253,13 +275,11 @@ class MetricService:
             doc_embs = self.embed_model.encode(documents, convert_to_tensor=True, normalize_embeddings=True)
 
             # ⚡ Bolt Optimization: Batch encode all summary sentences at once
-            # This reduces embedding model calls from N+1 to 2
             if summary_sents:
                 query_embs = self.embed_model.encode(summary_sents, convert_to_tensor=True, normalize_embeddings=True)
                 # Compute all similarities in one matrix operation [num_queries, num_docs]
                 all_emb_scores = util.cos_sim(query_embs, doc_embs)
 
-        # Actually, let's restructure the loop to separate phases to minimize swapping.
         # Phase 1: Retrieve Candidates (BM25 + Embedding)
 
         # Build BM25 index ONCE
@@ -301,20 +321,18 @@ class MetricService:
         if self.reranker_model:
             self.reranker_model.to(self.device)
             
-        # Phase 2: Rerank
-        for i, query_sent in enumerate(summary_sents):
-            top_candidates = all_top_candidates[i]
-            
-            if not top_candidates:
-                result["matches"].append({
+        # Phase 2: Batch Rerank
+        batch_results = self._rerank_batch(summary_sents, documents, all_top_candidates)
+
+        for i, (best_idx, best_score) in enumerate(batch_results):
+            if best_idx == -1 and not all_top_candidates[i]:
+                 # handle empty matches
+                 result["matches"].append({
                     "summary_idx": i,
                     "source_indices": [],
                     "scores": []
                 })
-                continue
-
-            # C. Reranking (The Judge)
-            best_idx, best_score = self._rerank_candidates(query_sent, documents, top_candidates)
+                 continue
             
             # Construct Result
             match_detail = {
