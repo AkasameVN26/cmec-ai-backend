@@ -12,4 +12,4 @@ sentence-transformers
 torch
 numpy
 scikit-learn
-pysbd
+chonkie

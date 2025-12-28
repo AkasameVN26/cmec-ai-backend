@@ -6,7 +6,8 @@ from sentence_transformers import SentenceTransformer, util
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from rank_bm25 import BM25Okapi
 from underthesea import word_tokenize
-import pysbd
+from chonkie import RecursiveChunker
+from app.core.chunking import get_medical_chunker
 from fastapi.concurrency import run_in_threadpool
 
 from app.models.schemas import SourceSegment
@@ -27,7 +28,7 @@ class MetricService:
         
         self._is_loaded = False
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.segmenter = pysbd.Segmenter(language="en", clean=False)
+        self.chunker = None # Will be initialized in load_models with the correct tokenizer
 
     def load_models(self):
         if self._is_loaded:
@@ -42,6 +43,24 @@ class MetricService:
         except Exception as e:
             print(f"Warning: Could not load tokenizer {self.tokenizer_name}: {e}")
             self.tokenizer = None
+
+        # Initialize Chonkie with custom medical rules
+        try:
+            print("Initializing Custom Medical Chonkie...")
+            self.chunker = get_medical_chunker(
+                tokenizer=self.tokenizer if self.tokenizer else "gpt2",
+                chunk_size=128,
+                min_characters_per_chunk=12
+            )
+        except Exception as e:
+            print(f"Warning: Could not initialize Medical Chonkie: {e}")
+            # Fallback to basic chunker if custom fails
+            self.chunker = RecursiveChunker(
+                tokenizer=self.tokenizer if self.tokenizer else "gpt2",
+                chunk_size=128,
+                min_characters_per_chunk=12
+            )
+            print(f"Warning: Using fallback basic chunker: {e}")
 
         print(f"Loading embedding model: {self.embedding_model_name}...")
         try:
@@ -227,11 +246,16 @@ class MetricService:
         
         # 1. Segmentation
         try:
-            summary_sents = self.segmenter.segment(summary_text) if summary_text.strip() else []
+            if not self.chunker:
+                # Fallback just in case load_models partially failed but didn't crash
+                self.chunker = RecursiveChunker(tokenizer="gpt2", chunk_size=256, min_characters_per_chunk=12)
+
+            # Chonkie returns Chunk objects, we need the text
+            summary_sents = [c.text for c in self.chunker.chunk(summary_text)] if summary_text.strip() else []
             
             flattened_source_segments = []
             for seg in source_segments:
-                seg_sents = self.segmenter.segment(seg.content) if seg.content.strip() else []
+                seg_sents = [c.text for c in self.chunker.chunk(seg.content)] if seg.content.strip() else []
                 for s in seg_sents:
                     flattened_source_segments.append(SourceSegment(
                         content=s,
@@ -239,8 +263,8 @@ class MetricService:
                         source_id=seg.source_id
                     ))
         except Exception as e:
-            print(f"Error in sentence tokenization: {e}")
-            return {"error": f"Tokenization error: {str(e)}"}
+            print(f"Error in chunking: {e}")
+            return {"error": f"Chunking error: {str(e)}"}
         
         if not flattened_source_segments or not summary_sents:
             return {
