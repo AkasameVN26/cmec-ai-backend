@@ -12,7 +12,7 @@ def get_medical_chunker(
             # Single level with custom delimiters list
             # Order: longer sequences first to prevent premature splitting
             RecursiveLevel(
-                delimiters=["\n\n**", "\n\n", "\n-", ". ", ";", "\n", " "], 
+                delimiters=["\n\n**", "\n\n", "\n-", ". ", "; ", ";", "\n", " "], 
                 include_delim="prev"
             )
         ]
