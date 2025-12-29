@@ -46,11 +46,11 @@ class MetricService:
 
         # Initialize Chonkie with custom medical rules
         try:
-            print("Initializing Custom Medical Chonkie...")
+            print("Initializing Custom Medical Chonkie (chunk_size=128)...")
             self.chunker = get_medical_chunker(
                 tokenizer=self.tokenizer if self.tokenizer else "gpt2",
                 chunk_size=128,
-                min_characters_per_chunk=12
+                min_characters_per_chunk=6
             )
         except Exception as e:
             print(f"Warning: Could not initialize Medical Chonkie: {e}")
@@ -58,7 +58,7 @@ class MetricService:
             self.chunker = RecursiveChunker(
                 tokenizer=self.tokenizer if self.tokenizer else "gpt2",
                 chunk_size=128,
-                min_characters_per_chunk=12
+                min_characters_per_chunk=6
             )
             print(f"Warning: Using fallback basic chunker: {e}")
 

@@ -3,16 +3,21 @@ from typing import Union, Callable, Any
 
 def get_medical_chunker(
     chunk_size: int = 128, 
-    min_characters_per_chunk: int = 24,
+    min_characters_per_chunk: int = 4,
     tokenizer: Union[str, Callable, Any] = "character"
 ) -> RecursiveChunker:
     
     medical_rules = RecursiveRules(
         levels=[
-            # Single level with custom delimiters list
-            # Order: longer sequences first to prevent premature splitting
+            # Level 0: Structured Headers & Punctuation
+            # Added ': ' for key-value pairs and '. **' for inline section headers
             RecursiveLevel(
-                delimiters=["\n\n**", "\n\n", "\n-", ". ", "; ", ";", "\n", " "], 
+                delimiters=["\n\n**", " **", "**", ". **", "\n\n", "\n-", ". ", "; ", ";", "\n", " "], 
+                include_delim="prev"
+            ),
+            # Level 1: Word level (Whitespace) fallback
+            RecursiveLevel(
+                whitespace=True, 
                 include_delim="prev"
             )
         ]
