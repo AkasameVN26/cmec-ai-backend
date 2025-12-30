@@ -130,7 +130,7 @@ async def benchmark_workflow():
                 return
             
             explanation_data = explain_response.json()
-            citations = explanation_data.get("citations", [])
+            matches = explanation_data.get("matches", [])
             
             log_msg(log_file, f"   Full Explanation Response:\n{json.dumps(explanation_data, ensure_ascii=False, indent=2)}", to_console=False)
             
@@ -140,7 +140,7 @@ async def benchmark_workflow():
             
         end_explain = time.perf_counter()
         explain_time = end_explain - start_explain
-        log_msg(log_file, f"   ✅ Citations Found: {len(citations)}")
+        log_msg(log_file, f"   ✅ Matches Found: {len(matches)}")
         log_msg(log_file, f"   ⏱️  Time: {explain_time:.4f} s")
 
     # --- FINAL REPORT ---
