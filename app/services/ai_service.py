@@ -14,15 +14,7 @@ Quy tắc bắt buộc:
 - Trích xuất tối đa các chi tiết lâm sàng có giá trị NẾU CHÚNG CÓ TRONG VĂN BẢN.
 - Chỉ trình bày bản tóm tắt, không đưa ra lời khuyên hay nhận xét cá nhân."""
 
-BASE_INSTRUCTION = """CẤU TRÚC TÓM TẮT:
-1. Thông tin chung & Lý do khám:
-2. Tiền sử:
-3. Tóm tắt bệnh sử & Diễn biến:
-4. Khám Lâm sàng (Chỉ ghi dấu hiệu dương tính & Sinh hiệu):
-5. Các kết luận của kết quả Cận lâm sàng:
-6. Chẩn đoán & Kế hoạch điều trị (Thuốc/Thủ thuật):
-
-Dựa vào văn bản dưới đây, hãy hoàn thành bản tóm tắt:"""
+BASE_INSTRUCTION = "Tóm tắt diễn biến điều trị của hồ sơ bệnh án sau:\n"
 
 OPTIONS = {
     "repeat_penalty": 1.05,
@@ -30,7 +22,7 @@ OPTIONS = {
     "top_k": 40,
     "min_p": 0.05,
     "top_p": 1.0,
-    "seed": 0
+    "seed": 42
 }
 
 class AIService:

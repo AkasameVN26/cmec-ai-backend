@@ -30,6 +30,10 @@ class MetricService:
         self.source_chunker = None 
         self.summary_chunker = None
 
+        # Custom Instruction for Medical Retrieval (Qwen Best Practice)
+        self.retrieval_instruction = "Given a claim from a medical summary, retrieve relevant clinical evidence, lab results, and doctor notes from the patient record."
+        self.query_prompt = f"Instruct: {self.retrieval_instruction}\nQuery: "
+
     def load_models(self):
         if self._is_loaded:
             return
@@ -116,7 +120,7 @@ class MetricService:
             return []
             
         # Embed query
-        query_emb = self.embed_model.encode(query, convert_to_tensor=True, normalize_embeddings=True)
+        query_emb = self.embed_model.encode(query, prompt=self.query_prompt, convert_to_tensor=True, normalize_embeddings=True)
 
         # Embed docs if not provided
         if doc_embs is None:
@@ -183,7 +187,7 @@ class MetricService:
              return [(candidates[0] if candidates else -1, 0.0) for candidates in all_candidate_indices]
 
         # Tokenize and Inference in Chunks
-        BATCH_SIZE = 8 # Reduced from 16 to prevent system hang/OOM
+        BATCH_SIZE = 12
         all_scores = []
         
         for i in range(0, len(all_pairs), BATCH_SIZE):
@@ -286,7 +290,7 @@ class MetricService:
             "low_similarity_matches": []
         }
 
-        LOW_SIMILARITY_THRESHOLD = 0.5 
+        LOW_SIMILARITY_THRESHOLD = 0.7 
 
         # --- Embedding Calculation Batch ---
         # Move Embedding Model to GPU
@@ -303,7 +307,7 @@ class MetricService:
 
             # ⚡ Bolt Optimization: Batch encode all summary sentences at once
             if summary_sents:
-                query_embs = self.embed_model.encode(summary_sents, convert_to_tensor=True, normalize_embeddings=True)
+                query_embs = self.embed_model.encode(summary_sents, prompt=self.query_prompt, convert_to_tensor=True, normalize_embeddings=True)
                 # Compute all similarities in one matrix operation [num_queries, num_docs]
                 all_emb_scores = util.cos_sim(query_embs, doc_embs)
 
@@ -422,7 +426,7 @@ class MetricService:
             self.embed_model.to(self.device)
             try:
                 # Encoding can be heavy
-                emb_summary = self.embed_model.encode([generated_text], prompt_name="query", convert_to_tensor=True, normalize_embeddings=True)
+                emb_summary = self.embed_model.encode([generated_text], prompt=self.query_prompt, convert_to_tensor=True, normalize_embeddings=True)
                 emb_source = self.embed_model.encode([source_text], convert_to_tensor=True, normalize_embeddings=True)
                 similarity_score = util.cos_sim(emb_summary, emb_source).item()
                 metrics["similarity_score"] = similarity_score
