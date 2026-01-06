@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 
 # Configuration
-RECORD_ID = 38
+RECORD_ID = int(input("Nhập id bệnh án cần test: "))
 BASE_URL = "http://127.0.0.1:8000"
 LOG_DIR = "logs"
 
@@ -67,7 +67,7 @@ async def benchmark_workflow():
             
             data_content = prep_response.text
             data_size = len(data_content)
-            log_msg(log_file, f"   Response Preview (first 500 chars):\n{data_content[:500]}...", to_console=False)
+            log_msg(log_file, f"   Response Preview (first 500 chars):\n{data_content}...", to_console=False)
             
         except Exception as e:
             log_msg(log_file, f"   ❌ Exception: {e}")
