@@ -54,13 +54,13 @@ class MetricService:
             base_tokenizer = self.tokenizer if self.tokenizer else "gpt2"
             self.source_chunker = RecursiveChunker(
                 tokenizer=base_tokenizer,
-                chunk_size=64,
+                chunk_size=128,
                 min_characters_per_chunk=12
             )
             self.summary_chunker = RecursiveChunker(
                 tokenizer=base_tokenizer,
                 chunk_size=32,
-                min_characters_per_chunk=6
+                min_characters_per_chunk=12
             )
         except Exception as e:
             print(f"Warning: Could not initialize RecursiveChunkers: {e}")
@@ -255,7 +255,7 @@ class MetricService:
                 # Fallback just in case load_models partially failed but didn't crash
                 base_tokenizer = self.tokenizer if self.tokenizer else "gpt2"
                 self.summary_chunker = RecursiveChunker(tokenizer=base_tokenizer, chunk_size=32, min_characters_per_chunk=12)
-                self.source_chunker = RecursiveChunker(tokenizer=base_tokenizer, chunk_size=64, min_characters_per_chunk=6)
+                self.source_chunker = RecursiveChunker(tokenizer=base_tokenizer, chunk_size=128, min_characters_per_chunk=12)
 
             # Chonkie returns Chunk objects, we need the text
             summary_sents = [c.text for c in self.summary_chunker.chunk(summary_text)] if summary_text.strip() else []

@@ -18,10 +18,10 @@ BASE_INSTRUCTION = "Tóm tắt diễn biến điều trị của hồ sơ bệnh
 
 OPTIONS = {
     "repeat_penalty": 1.05,
-    "temperature": 0.4,
+    "temperature": 0.3,
     "top_k": 40,
     "min_p": 0.05,
-    "top_p": 1.0,
+    "top_p": 0.6,
     "seed": 42
 }
 
