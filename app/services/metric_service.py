@@ -168,7 +168,7 @@ class MetricService:
         
         token_false_id = self.reranker_tokenizer.convert_tokens_to_ids("no")
         token_true_id = self.reranker_tokenizer.convert_tokens_to_ids("yes")
-        max_length = 4096
+        max_length = 512
 
         all_pairs = []
         
@@ -187,7 +187,7 @@ class MetricService:
              return [(candidates[0] if candidates else -1, 0.0) for candidates in all_candidate_indices]
 
         # Tokenize and Inference in Chunks
-        BATCH_SIZE = 12
+        BATCH_SIZE = 8
         all_scores = []
         
         for i in range(0, len(all_pairs), BATCH_SIZE):
