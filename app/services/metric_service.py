@@ -290,7 +290,7 @@ class MetricService:
             "low_similarity_matches": []
         }
 
-        LOW_SIMILARITY_THRESHOLD = 0.7 
+        LOW_SIMILARITY_THRESHOLD = 0.8 
 
         # --- Embedding Calculation Batch ---
         # Move Embedding Model to GPU
